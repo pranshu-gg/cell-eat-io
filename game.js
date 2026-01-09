@@ -20,7 +20,7 @@ let mouseY = 300;
 game.defineEntity('player')
     .with(Modu.Transform2D, { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 })
     .with(Modu.Sprite, { shape: 'circle', radius: BASE_SIZE, color: '#4CAF50' })
-    .with(Modu.Velocity2D, { x: 0, y: 0 })
+    .with(Modu.Body2D, { vx: 0, vy: 0 })
     .register();
 
 // Remote player entity
@@ -39,7 +39,7 @@ game.defineEntity('food')
 game.defineEntity('ai')
     .with(Modu.Transform2D, { x: 0, y: 0 })
     .with(Modu.Sprite, { shape: 'circle', radius: BASE_SIZE, color: '#9C27B0' })
-    .with(Modu.Velocity2D, { x: 0, y: 0 })
+    .with(Modu.Body2D, { vx: 0, vy: 0 })
     .register();
 
 // World boundary entity
@@ -148,7 +148,7 @@ game.onSharedStateChange('players', (data) => {
 game.onUpdate((dt) => {
     const playerTransform = game.getComponent(player, Modu.Transform2D);
     const playerSprite = game.getComponent(player, Modu.Sprite);
-    const playerVelocity = game.getComponent(player, Modu.Velocity2D);
+    const playerVelocity = game.getComponent(player, Modu.Body2D);
     
     // Update camera
     cameraX = playerTransform.x - canvas.width / 2;
@@ -171,16 +171,16 @@ game.onUpdate((dt) => {
     
     if (dist > 5) {
         const speed = getSpeedForSize(playerSize);
-        playerVelocity.x = (dx / dist) * speed;
-        playerVelocity.y = (dy / dist) * speed;
+        playerVelocity.vx = (dx / dist) * speed;
+        playerVelocity.vy = (dy / dist) * speed;
     } else {
-        playerVelocity.x = 0;
-        playerVelocity.y = 0;
+        playerVelocity.vx = 0;
+        playerVelocity.vy = 0;
     }
     
     // Apply velocity
-    playerTransform.x += playerVelocity.x;
-    playerTransform.y += playerVelocity.y;
+    playerTransform.x += playerVelocity.vx;
+    playerTransform.y += playerVelocity.vy;
     
     // Clamp to world bounds
     playerTransform.x = Math.max(playerSize, Math.min(WORLD_WIDTH - playerSize, playerTransform.x));
@@ -207,7 +207,7 @@ game.onUpdate((dt) => {
     // AI behavior
     ais.forEach(aiObj => {
         const aiTransform = game.getComponent(aiObj.entity, Modu.Transform2D);
-        const aiVelocity = game.getComponent(aiObj.entity, Modu.Velocity2D);
+        const aiVelocity = game.getComponent(aiObj.entity, Modu.Body2D);
         const aiSprite = game.getComponent(aiObj.entity, Modu.Sprite);
         
         aiSprite.radius = aiObj.size;
@@ -254,13 +254,13 @@ game.onUpdate((dt) => {
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > 0) {
                 const speed = getSpeedForSize(aiObj.size) * 0.8;
-                aiVelocity.x = (dx / dist) * speed;
-                aiVelocity.y = (dy / dist) * speed;
+                aiVelocity.vx = (dx / dist) * speed;
+                aiVelocity.vy = (dy / dist) * speed;
             }
         }
-        
-        aiTransform.x += aiVelocity.x;
-        aiTransform.y += aiVelocity.y;
+
+        aiTransform.x += aiVelocity.vx;
+        aiTransform.y += aiVelocity.vy;
         
         // Clamp to world
         aiTransform.x = Math.max(aiObj.size, Math.min(WORLD_WIDTH - aiObj.size, aiTransform.x));
