@@ -59,10 +59,10 @@ let playerSize = BASE_SIZE;
 const foods = [];
 for (let i = 0; i < FOOD_COUNT; i++) {
     const food = game.spawn('food');
-    const transform = game.getComponent(food, Modu.Transform2D);
+    const transform = food.get(Modu.Transform2D);
     transform.x = Math.random() * WORLD_WIDTH;
     transform.y = Math.random() * WORLD_HEIGHT;
-    const sprite = game.getComponent(food, Modu.Sprite);
+    const sprite = food.get(Modu.Sprite);
     sprite.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
     foods.push({ entity: food, active: true });
 }
@@ -71,10 +71,10 @@ for (let i = 0; i < FOOD_COUNT; i++) {
 const ais = [];
 for (let i = 0; i < AI_COUNT; i++) {
     const ai = game.spawn('ai');
-    const transform = game.getComponent(ai, Modu.Transform2D);
+    const transform = ai.get(Modu.Transform2D);
     transform.x = Math.random() * WORLD_WIDTH;
     transform.y = Math.random() * WORLD_HEIGHT;
-    const sprite = game.getComponent(ai, Modu.Sprite);
+    const sprite = ai.get(Modu.Sprite);
     sprite.color = `hsl(${Math.random() * 360}, 60%, 40%)`;
     ais.push({ entity: ai, size: BASE_SIZE + Math.random() * 20, target: null });
 }
@@ -104,7 +104,7 @@ function getDistance(x1, y1, x2, y2) {
 }
 
 function respawnFood(foodObj) {
-    const transform = game.getComponent(foodObj.entity, Modu.Transform2D);
+    const transform = foodObj.entity.get(Modu.Transform2D);
     transform.x = Math.random() * WORLD_WIDTH;
     transform.y = Math.random() * WORLD_HEIGHT;
     foodObj.active = true;
@@ -126,8 +126,8 @@ game.onSharedStateChange('players', (data) => {
             remotePlayers[id] = { entity: remote, lastUpdate: Date.now() };
         }
         
-        const transform = game.getComponent(remotePlayers[id].entity, Modu.Transform2D);
-        const sprite = game.getComponent(remotePlayers[id].entity, Modu.Sprite);
+        const transform = remotePlayers[id].entity.get(Modu.Transform2D);
+        const sprite = remotePlayers[id].entity.get(Modu.Sprite);
         transform.x = playerData.x;
         transform.y = playerData.y;
         sprite.radius = playerData.size;
@@ -146,9 +146,9 @@ game.onSharedStateChange('players', (data) => {
 
 // Main game loop
 game.onUpdate((dt) => {
-    const playerTransform = game.getComponent(player, Modu.Transform2D);
-    const playerSprite = game.getComponent(player, Modu.Sprite);
-    const playerVelocity = game.getComponent(player, Modu.Body2D);
+    const playerTransform = player.get(Modu.Transform2D);
+    const playerSprite = player.get(Modu.Sprite);
+    const playerVelocity = player.get(Modu.Body2D);
     
     // Update camera
     cameraX = playerTransform.x - canvas.width / 2;
@@ -156,8 +156,8 @@ game.onUpdate((dt) => {
     
     // Apply camera offset to all entities
     game.query([Modu.Transform2D, Modu.Sprite]).forEach(entity => {
-        const transform = game.getComponent(entity, Modu.Transform2D);
-        const sprite = game.getComponent(entity, Modu.Sprite);
+        const transform = entity.get(Modu.Transform2D);
+        const sprite = entity.get(Modu.Sprite);
         sprite.offsetX = -cameraX;
         sprite.offsetY = -cameraY;
     });
@@ -192,7 +192,7 @@ game.onUpdate((dt) => {
     // Check food collision
     foods.forEach(foodObj => {
         if (!foodObj.active) return;
-        const foodTransform = game.getComponent(foodObj.entity, Modu.Transform2D);
+        const foodTransform = foodObj.entity.get(Modu.Transform2D);
         const distance = getDistance(playerTransform.x, playerTransform.y, foodTransform.x, foodTransform.y);
         
         if (distance < playerSize) {
@@ -206,9 +206,9 @@ game.onUpdate((dt) => {
     
     // AI behavior
     ais.forEach(aiObj => {
-        const aiTransform = game.getComponent(aiObj.entity, Modu.Transform2D);
-        const aiVelocity = game.getComponent(aiObj.entity, Modu.Body2D);
-        const aiSprite = game.getComponent(aiObj.entity, Modu.Sprite);
+        const aiTransform = aiObj.entity.get(Modu.Transform2D);
+        const aiVelocity = aiObj.entity.get(Modu.Body2D);
+        const aiSprite = aiObj.entity.get(Modu.Sprite);
         
         aiSprite.radius = aiObj.size;
         
@@ -220,7 +220,7 @@ game.onUpdate((dt) => {
         // Check foods
         foods.forEach(foodObj => {
             if (!foodObj.active) return;
-            const foodTransform = game.getComponent(foodObj.entity, Modu.Transform2D);
+            const foodTransform = foodObj.entity.get(Modu.Transform2D);
             const d = getDistance(aiTransform.x, aiTransform.y, foodTransform.x, foodTransform.y);
             if (d < minDist) {
                 minDist = d;
@@ -269,7 +269,7 @@ game.onUpdate((dt) => {
         // AI eats food
         foods.forEach(foodObj => {
             if (!foodObj.active) return;
-            const foodTransform = game.getComponent(foodObj.entity, Modu.Transform2D);
+            const foodTransform = foodObj.entity.get(Modu.Transform2D);
             const distance = getDistance(aiTransform.x, aiTransform.y, foodTransform.x, foodTransform.y);
             if (distance < aiObj.size) {
                 aiObj.size += GROWTH_RATE * 0.5;
@@ -300,7 +300,7 @@ game.onUpdate((dt) => {
     
     // Remote player collision
     for (const [id, remote] of Object.entries(remotePlayers)) {
-        const remoteTransform = game.getComponent(remote.entity, Modu.Transform2D);
+        const remoteTransform = remote.entity.get(Modu.Transform2D);
         const dist = getDistance(playerTransform.x, playerTransform.y, remoteTransform.x, remoteTransform.y);
         if (dist < Math.max(playerSize, remote.size || BASE_SIZE)) {
             if (playerSize > (remote.size || BASE_SIZE) * 1.1) {
