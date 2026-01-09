@@ -1,5 +1,5 @@
 const game = Modu.createGame();
-game.addPlugin(Modu.AutoRenderer, document.getElementById('game'));
+const renderer = game.addPlugin(Modu.AutoRenderer, document.getElementById('game'));
 
 const WORLD_WIDTH = 2000;
 const WORLD_HEIGHT = 2000;
@@ -10,7 +10,6 @@ const FOOD_SIZE = 8;
 const MAX_SPEED = 5;
 const GROWTH_RATE = 0.5;
 
-let playerId = 'player_' + Math.random().toString(36).substr(2, 9);
 let cameraX = 0;
 let cameraY = 0;
 let mouseX = 400;
@@ -21,12 +20,6 @@ game.defineEntity('player')
     .with(Modu.Transform2D, { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 })
     .with(Modu.Sprite, { shape: 'circle', radius: BASE_SIZE, color: '#4CAF50' })
     .with(Modu.Body2D, { vx: 0, vy: 0 })
-    .register();
-
-// Remote player entity
-game.defineEntity('remotePlayer')
-    .with(Modu.Transform2D, { x: 0, y: 0 })
-    .with(Modu.Sprite, { shape: 'circle', radius: BASE_SIZE, color: '#2196F3' })
     .register();
 
 // Food cell entity
@@ -79,9 +72,6 @@ for (let i = 0; i < AI_COUNT; i++) {
     ais.push({ entity: ai, size: BASE_SIZE + Math.random() * 20, target: null });
 }
 
-// Remote players storage
-const remotePlayers = {};
-
 // Mouse tracking
 const canvas = document.getElementById('game');
 canvas.addEventListener('mousemove', (e) => {
@@ -114,61 +104,30 @@ function getSpeedForSize(size) {
     return MAX_SPEED * (BASE_SIZE / size) * 1.5;
 }
 
-// Multiplayer sync
-game.onSharedStateChange('players', (data) => {
-    if (!data) return;
-    
-    for (const [id, playerData] of Object.entries(data)) {
-        if (id === playerId) continue;
-        
-        if (!remotePlayers[id]) {
-            const remote = game.spawn('remotePlayer');
-            remotePlayers[id] = { entity: remote, lastUpdate: Date.now() };
-        }
-        
-        const transform = remotePlayers[id].entity.get(Modu.Transform2D);
-        const sprite = remotePlayers[id].entity.get(Modu.Sprite);
-        transform.x = playerData.x;
-        transform.y = playerData.y;
-        sprite.radius = playerData.size;
-        remotePlayers[id].size = playerData.size;
-        remotePlayers[id].lastUpdate = Date.now();
-    }
-    
-    // Remove disconnected players
-    for (const id of Object.keys(remotePlayers)) {
-        if (!data[id] || Date.now() - remotePlayers[id].lastUpdate > 3000) {
-            game.destroy(remotePlayers[id].entity);
-            delete remotePlayers[id];
-        }
-    }
-});
-
-// Main game loop
-game.onUpdate((dt) => {
+// Main game loop using requestAnimationFrame
+function gameLoop() {
     const playerTransform = player.get(Modu.Transform2D);
     const playerSprite = player.get(Modu.Sprite);
     const playerVelocity = player.get(Modu.Body2D);
-    
+
     // Update camera
     cameraX = playerTransform.x - canvas.width / 2;
     cameraY = playerTransform.y - canvas.height / 2;
-    
+
     // Apply camera offset to all entities
     game.query([Modu.Transform2D, Modu.Sprite]).forEach(entity => {
-        const transform = entity.get(Modu.Transform2D);
         const sprite = entity.get(Modu.Sprite);
         sprite.offsetX = -cameraX;
         sprite.offsetY = -cameraY;
     });
-    
+
     // Player movement towards mouse
     const worldMouseX = mouseX + cameraX;
     const worldMouseY = mouseY + cameraY;
     const dx = worldMouseX - playerTransform.x;
     const dy = worldMouseY - playerTransform.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
+
     if (dist > 5) {
         const speed = getSpeedForSize(playerSize);
         playerVelocity.vx = (dx / dist) * speed;
@@ -177,24 +136,24 @@ game.onUpdate((dt) => {
         playerVelocity.vx = 0;
         playerVelocity.vy = 0;
     }
-    
+
     // Apply velocity
     playerTransform.x += playerVelocity.vx;
     playerTransform.y += playerVelocity.vy;
-    
+
     // Clamp to world bounds
     playerTransform.x = Math.max(playerSize, Math.min(WORLD_WIDTH - playerSize, playerTransform.x));
     playerTransform.y = Math.max(playerSize, Math.min(WORLD_HEIGHT - playerSize, playerTransform.y));
-    
+
     // Update player sprite size
     playerSprite.radius = playerSize;
-    
+
     // Check food collision
     foods.forEach(foodObj => {
         if (!foodObj.active) return;
         const foodTransform = foodObj.entity.get(Modu.Transform2D);
         const distance = getDistance(playerTransform.x, playerTransform.y, foodTransform.x, foodTransform.y);
-        
+
         if (distance < playerSize) {
             playerSize += GROWTH_RATE;
             foodObj.active = false;
@@ -203,20 +162,20 @@ game.onUpdate((dt) => {
             foodTransform.y = -1000;
         }
     });
-    
+
     // AI behavior
     ais.forEach(aiObj => {
         const aiTransform = aiObj.entity.get(Modu.Transform2D);
         const aiVelocity = aiObj.entity.get(Modu.Body2D);
         const aiSprite = aiObj.entity.get(Modu.Sprite);
-        
+
         aiSprite.radius = aiObj.size;
-        
+
         // Find nearest target (food or smaller player)
         let targetX = null;
         let targetY = null;
         let minDist = Infinity;
-        
+
         // Check foods
         foods.forEach(foodObj => {
             if (!foodObj.active) return;
@@ -228,7 +187,7 @@ game.onUpdate((dt) => {
                 targetY = foodTransform.y;
             }
         });
-        
+
         // Check if player is smaller and nearby
         if (playerSize < aiObj.size * 0.9) {
             const d = getDistance(aiTransform.x, aiTransform.y, playerTransform.x, playerTransform.y);
@@ -237,7 +196,7 @@ game.onUpdate((dt) => {
                 targetY = playerTransform.y;
             }
         }
-        
+
         // Flee from larger player
         if (playerSize > aiObj.size * 1.1) {
             const d = getDistance(aiTransform.x, aiTransform.y, playerTransform.x, playerTransform.y);
@@ -246,7 +205,7 @@ game.onUpdate((dt) => {
                 targetY = aiTransform.y - (playerTransform.y - aiTransform.y);
             }
         }
-        
+
         // Move towards target
         if (targetX !== null) {
             const dx = targetX - aiTransform.x;
@@ -261,11 +220,11 @@ game.onUpdate((dt) => {
 
         aiTransform.x += aiVelocity.vx;
         aiTransform.y += aiVelocity.vy;
-        
+
         // Clamp to world
         aiTransform.x = Math.max(aiObj.size, Math.min(WORLD_WIDTH - aiObj.size, aiTransform.x));
         aiTransform.y = Math.max(aiObj.size, Math.min(WORLD_HEIGHT - aiObj.size, aiTransform.y));
-        
+
         // AI eats food
         foods.forEach(foodObj => {
             if (!foodObj.active) return;
@@ -279,7 +238,7 @@ game.onUpdate((dt) => {
                 foodTransform.y = -1000;
             }
         });
-        
+
         // AI vs Player collision
         const playerDist = getDistance(aiTransform.x, aiTransform.y, playerTransform.x, playerTransform.y);
         if (playerDist < Math.max(aiObj.size, playerSize)) {
@@ -297,30 +256,13 @@ game.onUpdate((dt) => {
             }
         }
     });
-    
-    // Remote player collision
-    for (const [id, remote] of Object.entries(remotePlayers)) {
-        const remoteTransform = remote.entity.get(Modu.Transform2D);
-        const dist = getDistance(playerTransform.x, playerTransform.y, remoteTransform.x, remoteTransform.y);
-        if (dist < Math.max(playerSize, remote.size || BASE_SIZE)) {
-            if (playerSize > (remote.size || BASE_SIZE) * 1.1) {
-                playerSize += (remote.size || BASE_SIZE) * 0.3;
-            } else if ((remote.size || BASE_SIZE) > playerSize * 1.1) {
-                playerSize = BASE_SIZE;
-                playerTransform.x = Math.random() * WORLD_WIDTH;
-                playerTransform.y = Math.random() * WORLD_HEIGHT;
-            }
-        }
-    }
-    
-    // Sync player state
-    const currentPlayers = game.getSharedState('players') || {};
-    currentPlayers[playerId] = {
-        x: playerTransform.x,
-        y: playerTransform.y,
-        size: playerSize
-    };
-    game.setSharedState('players', currentPlayers);
-});
 
-game.start();
+    // Render
+    renderer.render();
+
+    // Continue loop
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+requestAnimationFrame(gameLoop);
